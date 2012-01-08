@@ -5,7 +5,6 @@ use strict;
 use warnings;
 
 use Moo;
-use MIME::Base64;
 
 =head1 NAME
 
@@ -24,12 +23,12 @@ our $VERSION = '0.01';
 Create signatures:
 
     use Crypt::HTTP::Signature;
-    use File::Slurp;
+    use File::Slurp qw(read_file);
     use HTTP::Request::Common;
 
     my $c = Crypt::HTTP::Signature->new(
-        public_key_callback => sub { File::Slurp::read_file("/my/pub_key.pem"); },
-        private_key_callback => sub { File::Slurp::read_file("/my/priv_key.pem"); },
+        public_key_callback => sub { read_file("/my/pub_key.pem") or die $!; },
+        private_key_callback => sub { read_file("/my/priv_key.pem") or die $!; },
         key_id => 'Test',
     );
 
@@ -49,8 +48,8 @@ Validate signatures:
 
     use 5.010;
     use Crypt::HTTP::Signature;
+    use HTTP::Request::Common;
     use File::Slurp;
-    use Try::Tiny;
 
     my $c = Crypt::HTTP::Signature->new(
         public_key_callback => sub { File::Slurp::read_file("/my/pub_key.pem"); },
@@ -66,12 +65,14 @@ Validate signatures:
             Content => '{"hello": "world"}'
     );
 
-    try {
-        $c->validate($req) or die $c->error;
+    my $header = $req->header('Authorization');
+    my $signature = $c->parse($header);
+
+    if ( $c->validate($signature) ) {
         say "Request is valid!"
     }
-    catch {
-        say "Request isn't valid: $_";
+    else {
+        say "Request isn't valid";
     };
 
 =head1 PURPOSE
@@ -83,41 +84,6 @@ connections (hopefully over HTTPS) using either an RSA keypair or a symmetric
 
 These are Perlish mutators; give an argument to set a value or no argument to get the current value.
 
-=over
-
-=item * public_key_callback
-
-Expects a C<CODE> reference to be used to generate a buffer containing an RSA public key. The key_id attribute's
-value will be supplied to the callback as its first parameter.
-
-=back
-
-=cut
-
-has 'public_key_callback' => (
-    is => 'rw',
-    isa => sub { ref($_[0] eq 'CODE' },
-    predicate => 'has_public_key_callback',
-    lazy => 1,
-);
-
-=over
-
-=item * private_key_callback
-
-Expects a C<CODE> reference to be used to generate a buffer containing an RSA private key. The key_id 
-attribute's value will be supplied to the callback as its first parameter.
-
-=back
-
-=cut
-
-has 'private_key_callback' => (
-    is => 'rw',
-    isa => sub { ref($_[0]) eq 'CODE' },
-    predicate => 'has_private_key_callback',
-    lazy => 1,
-);
 
 =over
 
@@ -173,22 +139,6 @@ has 'skew' => (
     default => { 300 },
 );
 
-=over
-
-=item * key_id
-
-A means to identify the key being used to both sender and receiver. This can be any token which makes
-sense to the sender and receiver. The exact specification of a token and any necessary key management 
-are outside the scope of this library.
-
-=back
-
-=cut
-
-has 'key_id' => (
-    is => 'rw',
-    predicate => 'has_key_id',
-);
 
 =over
 
@@ -223,6 +173,22 @@ has 'headers' => (
 
 =over
 
+=item * signing_string
+
+The string used to compute the signature digest. It contents are derived from the 
+values of the C<headers> array.
+
+=back
+
+=cut
+
+has 'signing_string' => (
+    is => 'rw',
+    predicate => 'has_signing_string',
+);
+
+=over
+
 =item * signature
 
 Contains the digital signature authorization data.
@@ -251,21 +217,24 @@ has 'extensions' => (
     predicate => 'has_extensions',
 );
 
+
 =over
 
-=item * error
+=item * key_id
 
-Contains any error text from operation.
+A means to identify the key being used to both sender and receiver. This can be any token which makes
+sense to the sender and receiver. The exact specification of a token and any necessary key management 
+are outside the scope of this library.
 
 =back
 
 =cut
 
-has 'error' => (
+has 'key_id' => (
     is => 'rw',
-    writer => '_set_error',
-    predicate => 'has_error',
+    predicate => 'has_key_id',
 );
+
 
 =head1 METHODS
 
