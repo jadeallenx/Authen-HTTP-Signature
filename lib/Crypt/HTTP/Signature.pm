@@ -47,10 +47,14 @@ Create signatures:
 Validate signatures:
 
     use 5.010;
-    use Crypt::HTTP::Signature::Parser;
+    use Crypt::HTTP::Signature;
     use HTTP::Request::Common;
     use File::Slurp;
-    use Try::Tiny;
+
+    my $c = Crypt::HTTP::Signature->new(
+        public_key_callback => sub { File::Slurp::read_file("/my/pub_key.pem"); },
+        private_key_callback => sub { File::Slurp::read_file("/my/priv_key.pem"); },
+    );
 
     my $req = POST('http://example.com/foo?param=value&pet=dog', 
             Content_Type => 'application/json',
@@ -61,17 +65,10 @@ Validate signatures:
             Content => '{"hello": "world"}'
     );
 
-    my $c;
-    try {
-        $c = Crypt::HTTP::Signature::Parser->new($req);
-    }
-    catch {
-        die Parse failed: $_\n";
-    };
+    my $header = $req->header('Authorization');
+    my $signature = $c->parse($header);
 
-    $c->private_key_callback( sub{ read_file("/my/private/key.pem") } );
-
-    if ( $c->validate() ) {
+    if ( $c->validate($signature) ) {
         say "Request is valid!"
     }
     else {
@@ -87,9 +84,10 @@ connections (hopefully over HTTPS) using either an RSA keypair or a symmetric
 
 These are Perlish mutators; give an argument to set a value or no argument to get the current value.
 
+
 =over
 
-=item algorithm
+=item * algorithm
 
 One of:
 
@@ -117,22 +115,34 @@ has 'algorithm' => (
     is => 'rw',
     isa => sub { 
         my $n = shift; 
-        die "$n doesn't match any supported algorithm.\n" unless 
-            scalar grep { $_ eq $n } qw(
-                rsa-sha1 
-                rsa-sha256 
-                rsa-sha512 
-                hmac-sha1 
-                hmac-sha256 
-                hmac-sha512
-            ); 
+        my @algos = grep { $_ eq $n } qw(rsa-sha1 rsa-sha256 rsa-sha512 
+            hmac-sha1 hmac-sha256 hmac-sha512); 
+        return scalar @algos;
     },
     default => sub { 'rsa-sha256' },
 );
 
+=over 
+
+=item * skew
+
+Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range, 
+the request is considered invalid.
+
+=back
+
+=cut
+
+has 'skew' => (
+    is => 'rw',
+    isa => sub { $_[0] =~ /0-9+/ },
+    default => { 300 },
+);
+
+
 =over
 
-=item headers
+=item * headers
 
 The list of headers to be signed (or already signed.) Defaults to the 'Date' header. The order of the headers 
 in this list will be used to build the order of the text in the signing string.
@@ -157,12 +167,13 @@ Use all headers in a given request including the request itself in the signing s
 
 has 'headers' => (
     is => 'rw',
-    isa => sub { die "This attribute expects an arrayref.\n" unless ref($_[0]) eq ref([]) },
+    isa => sub { ref($_[0]) eq ref([]) },
+    default => sub { [] },
 );
 
 =over
 
-=item signing_string
+=item * signing_string
 
 The string used to compute the signature digest. It contents are derived from the 
 values of the C<headers> array.
@@ -178,7 +189,7 @@ has 'signing_string' => (
 
 =over
 
-=item signature
+=item * signature
 
 Contains the digital signature authorization data.
 
@@ -188,12 +199,11 @@ Contains the digital signature authorization data.
 
 has 'signature' => (
     is => 'rw',
-    predicate => 'has_signature',
 );
 
 =over
 
-=item extensions
+=item * extensions
 
 There are currently no extentions implemented by this library, but the library will append extension
 information to the generated header data if this attribute has one or more values.
@@ -210,7 +220,7 @@ has 'extensions' => (
 
 =over
 
-=item key_id
+=item * key_id
 
 A means to identify the key being used to both sender and receiver. This can be any token which makes
 sense to the sender and receiver. The exact specification of a token and any necessary key management 
