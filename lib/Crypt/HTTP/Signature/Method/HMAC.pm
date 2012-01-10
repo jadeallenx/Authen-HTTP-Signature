@@ -31,7 +31,7 @@ These are Perlish mutators; pass a value to set it, pass no value to get the cur
 
 =over
 
-=item * key_callback
+=item key_callback
 
 Expects a C<CODE> reference to be used to generate the key material for the digest. The C<key_id>
 will be passed as the first parameter to the callback.
@@ -46,6 +46,20 @@ has 'key_callback' => (
     predicate => 'has_key_callback',
 );
 
+=over
+
+=item key
+
+The key material. If this attribute has a value, it will be used. (No callback will be made.)
+
+=back
+
+=cut
+
+has 'key' => (
+    is => 'rw',
+    predicate => 'has_key'
+);
 
 =head1 METHODS
 
@@ -101,15 +115,55 @@ stored as C<signature>.
 
 sub sign {
     my $self = shift;
-    
+    my $request = shift || $self->request;
+
+    confess "I don't have a request to sign" unless $request;
+
+    unless ( $request->header('Date') ) {
+        $request->header->date(time);
+    }
+
+    unless ( $self->has_signing_string ) {
+        $self->update_signing_string();
+    }
+ 
     confess "How can I sign anything without a signing string?\n" unless $self->has_signing_string;
-    confess "How can I sign anything without a key?\n" unless $self->has_key_callback;
+    confess "How can I sign anything without a key?\n" if not $self->has_key_callback || not $self->has_key;
 
-    my $key = $self->key_callback->($self->key_id);
+    my $key;
+    if ( $self->has_key ) {
+        $key = $self->key;
+    }
+    else {
+        $key = $self->key_callback->($self->key_id);
+    }
 
-    my $digest = $self->_get_digest($self->algorithm, $self->signing_string, $key);
-    
-    return $self->signature( $self->_pad_base64( $digest ) );
+    confess "I don't have a key!" unless $key;
+
+    $self->signature( $self->_generate_signature($key) );
+}
+
+sub sign_request {
+    my $self = shift;
+    my $request = shift || $self->request;
+
+    $self->sign($request);
+
+    $request->header( 'Authorization' => $self->format_signature );
+    return $request;
+}
+
+sub _generate_signature {
+    my $self = shift;
+    my $key = shift;
+
+    return $self->_pad_base64( 
+        $self->_get_digest(
+            $self->algorithm,
+            $self->signing_string,
+            $key
+        )
+    );
 }
 
 =over
@@ -125,17 +179,27 @@ returns a true value. Otherwise, it returns a false value.
 
 sub validate {
     my $self = shift;
-    
-    my $candidate = self->signature;
+    my $request = shift || $self->request;
+
+    confess "I don't have a request to validate" unless $request;
+
+    $self->check_skew();
+
+    my $candidate = $self->signature;
 
     confess "How can I validate anything without a signing string?" unless $self->has_signing_string;
-    confess "How can I validate anything without a key?" unless $self->has_key_callback;
+    confess "How can I validate anything without a key?" unless ( $self->has_key_callback || $self->has_key );
 
-    my $key = $self->key_callback->($self->key_id);
+    my $key;
+    if ( $self->has_key ) {
+        $key = $self->key;
+    }
+    else {
+        $key = $self->key_callback->($self->key_id);
+    }
 
-    my $digest = $self->_get_digest($self->algorithm, $self->signing_string, $key);
-    
-    return $self->_pad_base64( $digest ) eq $candidate;
+    confess "I don't have a key!" unless $key;
+    return $self->_generate_signature( $key ) eq $candidate;
 }
 
 1;

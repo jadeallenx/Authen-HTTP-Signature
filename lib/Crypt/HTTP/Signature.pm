@@ -5,6 +5,11 @@ use strict;
 use warnings;
 
 use Moo;
+use Scalar::Util qw(blessed);
+use List::Util qw(first);
+use Carp qw(confess);
+
+with 'Crypt::HTTP::Signature::Parse';
 
 =head1 NAME
 
@@ -22,12 +27,12 @@ our $VERSION = '0.01';
 
 Create signatures:
 
+    use 5.010;
     use Crypt::HTTP::Signature;
     use File::Slurp qw(read_file);
     use HTTP::Request::Common;
 
     my $c = Crypt::HTTP::Signature->new(
-        public_key_callback => sub { read_file("/my/pub_key.pem") or die $!; },
         private_key_callback => sub { read_file("/my/priv_key.pem") or die $!; },
         key_id => 'Test',
     );
@@ -40,17 +45,14 @@ Create signatures:
             Content => '{"hello": "world"}'
     );
 
-    my $signature = $c->sign($req); # uses the default 'Date' header
-
-    $req->header( Authorization => $signature );
+    my $signed_req = $c->sign_request($req); # signs the default 'Date' header with private_key
 
 Validate signatures:
 
     use 5.010;
-    use Crypt::HTTP::Signature::Parser;
+    use Crypt::HTTP::Signature;
     use HTTP::Request::Common;
-    use File::Slurp;
-    use Try::Tiny;
+    use File::Slurp qw(read_file);
 
     my $req = POST('http://example.com/foo?param=value&pet=dog', 
             Content_Type => 'application/json',
@@ -61,15 +63,10 @@ Validate signatures:
             Content => '{"hello": "world"}'
     );
 
-    my $c;
-    try {
-        $c = Crypt::HTTP::Signature::Parser->new($req);
-    }
-    catch {
-        die Parse failed: $_\n";
-    };
-
-    $c->private_key_callback( sub{ read_file("/my/private/key.pem") } );
+    $c = Crypt::HTTP::Signature->new( 
+        request => $req,
+        public_key_callback => sub{ read_file("/my/public/key.pem") },
+    );
 
     if ( $c->validate() ) {
         say "Request is valid!"
@@ -117,7 +114,7 @@ has 'algorithm' => (
     is => 'rw',
     isa => sub { 
         my $n = shift; 
-        die "$n doesn't match any supported algorithm.\n" unless 
+        confess "$n doesn't match any supported algorithm.\n" unless 
             scalar grep { $_ eq $n } qw(
                 rsa-sha1 
                 rsa-sha256 
@@ -141,13 +138,14 @@ This attribute can have some psuedo-values. These are:
 
 =over
 
-=item * C<:request_line>
+=item * C<request-line>
 
-Use the text of the request (e.g., C</foo?param=value&pet=dog>) as part of the signing string.
+Use the text of the path and query from the request (e.g., C</foo?param=value&pet=dog>) as part of 
+the signing string.
 
-=item * C<:all>
+=item * C<all>
 
-Use all headers in a given request including the request itself in the signing string.
+Use all headers in a given request including C<request-line> itself in the signing string.
 
 =back
 
@@ -157,7 +155,8 @@ Use all headers in a given request including the request itself in the signing s
 
 has 'headers' => (
     is => 'rw',
-    isa => sub { die "This attribute expects an arrayref.\n" unless ref($_[0]) eq ref([]) },
+    isa => sub { confess "The 'headers' attribute expects an arrayref.\n" unless ref($_[0]) eq ref([]) },
+    default => sub { [ 'Date' ] },
 );
 
 =over
@@ -225,13 +224,211 @@ has 'key_id' => (
     predicate => 'has_key_id',
 );
 
+=over
+
+=item request
+
+Holds the request to be parsed.
+
+=back
+
+=cut
+
+has 'request' => (
+    is => 'rw',
+    isa => sub { confess ref($_[0]) . " isn't a HTTP::Request" unless blessed($_[0]) =~ /HTTP::Request/ },
+    predicate => 'has_request',
+);
+
+around request => sub {
+    my $orig = shift;
+    my $r = shift;
+
+    unless( blessed($r) eq "HTTP::Request" ) {
+        if ( ! ref($r) ) {
+            $orig->request( HTTP::Request->parse($r) );
+        }
+        else {
+            confess "I don't know how to coerce " . ref($r);
+        }
+    }
+};
+
+=over
+
+=item authorizaton_string
+
+The text to identify the HTTP signature authorization scheme. Currently defined as the string
+literal 'Signature'.  Read-only.
+
+=back
+
+=cut
+
+has 'authorization_string' => (
+    is => 'ro',
+    default => sub { 'Signature' },
+);
+
+=over
+
+=item header_callback
+
+Expects a C<CODE> reference.  
+
+This callback represents the method to get header values from the object in the C<request> attribute. 
+
+The request will be the first parameter, and name of the header to fetch a value will be provided 
+as the second parameter to the callback.
+
+B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
+is the path and query portions of the request's URI. (For more information see the 
+L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
+
+=back
+
+=cut
+
+has 'header_callback' => (
+    is => 'rw',
+    isa => sub { die "'header_callback' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
+    predicate => 'has_header_callback',
+    default => sub { 
+        my $self = shift;
+        my $request = shift;
+        my $header_name = shift;
+
+        $header_name eq 'request-line' ? $request->uri->path_query : $request->header($header_name);
+    },
+    lazy => 1,
+);
+
+=over 
+
+=item skew
+
+Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range, 
+the request is considered invalid.
+
+Set this value to 0 to disable skew checks. (Useful for testing, but far less secure!)
+
+=back
+
+=cut
+
+has 'skew' => (
+    is => 'rw',
+    isa => sub { die "$_[0] isn't an integer" unless $_[0] =~ /0-9+/ },
+    default => { 300 },
+);
 
 =head1 METHODS
 
+The specific signature, validation, and signature header parsing methods are provided by various
+roles: L<Crypt::HTTP::Signature::Method::HMAC>, L<Crypt::HTTP::Signature::Method::RSA>, 
+L<Crypt::HTTP::Signature::Parse>.  Please see those roles' documentation for more information
+about them.
 
+=over 
 
+=item update_signing_string()
 
+This method updates a signing string using the contents of the C<headers> attribute.
 
+=back
+
+=cut
+
+# if we find the 'all' header value, explode to include all headers.
+sub _explode_headers {
+    my $self = shift;
+
+    if ( first { $_ eq 'all' } @{ $self->headers } ) {
+        my @all = $self->request->header->header_field_names;
+        unshift @all, 'request-line';
+        $self->headers( \@all );
+    }
+}
+
+sub update_signing_string {
+    my $self = shift;
+
+    $self->_explode_headers();
+
+    confess "I can't update the signing string because I don't have a request" unless $self->has_request;
+    confess "I can't update the signing string because I don't have a header_callback" unless $self->has_header_callback;
+
+    my $ss = join "\n", map { $self->header_callback->($self->request, $_) or confess "Couldn't get header value for $_\n" } @{ $self->headers };
+
+    $self->signing_string( $ss );
+}
+
+=over
+
+=item format_signature()
+
+This method returns a formatted string ready to insert into an L<HTTP::Request> 
+object as the 'Authorization' header.
+
+=back
+
+=cut
+
+sub format_signature {
+    my $self = shift;
+    
+    $self->_explode_headers();
+
+    my $rv = sprintf(q{%s keyId="%s",algorithm="%s"}, 
+                $self->authorization_string,
+                $self->key_id,
+                $self->algorithm
+             );
+
+    if ( scalar @{ $self->headers } == 1 and $self->headers->[0] =~ /Date/i ) {
+        # if there's only the default header, omit the headers param
+    }
+    else {
+        $rv .= q{,headers="} . join " ", lc @{$self->headers} . q{"};
+    }
+
+    if ( $self->has_extentions ) {
+        $rv .= q{,ext="} . $self->extentsions . q{"};
+    }
+
+    $rv .= q{ } . $self->signature;
+
+    return $rv;
+
+}
+
+=over
+
+=item check_skew()
+
+The method checks if a signature is outside of the defined amount of clock skew. It understands all of the
+formats accepted by L<HTTP::Date>.
+
+=back
+
+=cut
+
+sub check_skew {
+    my $self = shift;
+
+    # Check clock skew
+    if ( $self->skew ) {
+        my $header_time = str2time($self->header_callback->($request, 'date'));
+        confess "No Date header was returned (or could be parsed)" unless $header_time;
+        my $diff = abs(time - $header_time);
+        if ( $diff >= $self->skew ) {
+           confess "Request is outside of clock skew tolerance: $diff seconds computed, " . $self->skew . " seconds allowed.\n";
+        }
+    }
+
+    return 1;
+
+}
 
 =head1 AUTHOR
 
