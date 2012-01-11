@@ -322,7 +322,7 @@ Set this value to 0 to disable skew checks for testing purposes.
 has 'skew' => (
     is => 'rw',
     isa => sub { die "$_[0] isn't an integer" unless $_[0] =~ /0-9+/ },
-    default => { 300 },
+    default => sub { 300 },
 );
 
 =head1 METHODS
