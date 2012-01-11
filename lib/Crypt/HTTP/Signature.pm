@@ -9,6 +9,8 @@ use Scalar::Util qw(blessed);
 use List::Util qw(first);
 use Carp qw(confess);
 
+use Digest::MD5 qw(md5_base64);
+
 with 'Crypt::HTTP::Signature::Parse';
 
 =head1 NAME
@@ -78,7 +80,8 @@ Validate signatures:
 =head1 PURPOSE
 
 This is an implementation of Joyent's HTTP signature authentication scheme. The idea is to authenticate
-connections (hopefully over HTTPS) using either an RSA keypair or a symmetric
+connections (over HTTPS ideally) using either an RSA keypair or a symmetric key by signing a set of header 
+values.
 
 =head1 ATTRIBUTES
 
@@ -310,7 +313,7 @@ has 'header_callback' => (
 Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range, 
 the request is considered invalid.
 
-Set this value to 0 to disable skew checks. (Useful for testing, but far less secure!)
+Set this value to 0 to disable skew checks for testing purposes.
 
 =back
 
@@ -416,10 +419,13 @@ formats accepted by L<HTTP::Date>.
 sub check_skew {
     my $self = shift;
 
-    # Check clock skew
     if ( $self->skew ) {
+        my $request = shift || $self->request;
+        confess "No request found" unless $request;
+
         my $header_time = str2time($self->header_callback->($request, 'date'));
         confess "No Date header was returned (or could be parsed)" unless $header_time;
+
         my $diff = abs(time - $header_time);
         if ( $diff >= $self->skew ) {
            confess "Request is outside of clock skew tolerance: $diff seconds computed, " . $self->skew . " seconds allowed.\n";
@@ -428,6 +434,80 @@ sub check_skew {
 
     return 1;
 
+}
+
+=over
+
+=item sign_request()
+
+Uses the C<sign()> method and adds the C<Authorization> header to a request with a properly
+formatted signature line.
+
+Takes an optional L<HTTP::Request> object. The default input is the C<request> attribute.
+
+Returns a signed request with an updated 'Date' header.
+
+=back
+
+=cut
+
+sub sign_request {
+    my $self = shift;
+    my $request = shift || $self->request;
+
+    confess "I don't have a request to sign" unless $request;
+
+    $self->sign($request);
+
+    $request->header( 'Authorization' => $self->format_signature );
+
+    $self->request($request);
+}
+
+=over 
+
+=item update_date_header()
+
+Updates the C<Date> header in a request with the current system GMT date and time.
+
+=back
+
+=cut
+
+sub update_date_header {
+    my $self = shift;
+    my $request = shift || $self->request;
+
+    $request->header->date(time);
+
+    $self->request($request);
+}
+
+=over
+
+=item hash_request_content()
+
+Adds a C<Content-MD5> header to the request. Optionally takes a L<HTTP::Request> object; 
+it uses C<request> as its default input.
+
+=back
+
+=cut
+
+sub hash_request_content {
+    my $self = shift;
+    my $request || $self->request;
+
+    return undef unless $request;
+
+    my $digest = md5_base64($request->content);
+
+    # Padding for Base64 interop
+    $digest .= '==';
+
+    $request->header( 'Content-MD5' => $digest );
+
+    $self->request( $request );
 }
 
 =head1 AUTHOR
@@ -473,6 +553,10 @@ L<https://github.com/mrallen1/Crypt-HTTP-Signature/>
 =back
 
 =head1 SEE ALSO
+
+L<Crypt::HTTP::Signature::Parse>, 
+L<Crypt::HTTP::Signature::Method::HMAC>, 
+L<Crypt::HTTP::Signature::Method::RSA>
 
 L<Joyent's HTTP Signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>
 

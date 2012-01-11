@@ -11,10 +11,6 @@ use Carp qw(confess);
 
 Crypt::HTTP::Signature::Parse - Parse HTTP signature headers
 
-=head1 VERSION
-
-Version: 0.01
-
 =cut
 
 our $VERSION = '0.01';
