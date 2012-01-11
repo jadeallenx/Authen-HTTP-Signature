@@ -106,8 +106,11 @@ sub _get_digest {
 
 =item sign()
 
-This method computes and returns a base 64 encoded digest of the C<signing_string>. It is also
-stored as C<signature>.
+This method computes and returns a base 64 encoded digest of the C<signing_string> using the
+C<key> and C<algorithm>. The result is stored as C<signature>. 
+
+If the request does not already have a C<Date> header, this method adds one using the current GMT 
+system time.
 
 =back
 
@@ -122,10 +125,11 @@ sub sign {
     unless ( $request->header('Date') ) {
         $request->header->date(time);
     }
-
-    unless ( $self->has_signing_string ) {
-        $self->update_signing_string();
+    else {
+        $self->check_skew();
     }
+
+    $self->update_signing_string();
  
     confess "How can I sign anything without a signing string?\n" unless $self->has_signing_string;
     confess "How can I sign anything without a key?\n" if not $self->has_key_callback || not $self->has_key;
@@ -143,11 +147,26 @@ sub sign {
     $self->signature( $self->_generate_signature($key) );
 }
 
+=over
+
+=item sign_request()
+
+Like the method above, but also adds the C<Authorization> header to the request with a properly
+formatted signature.
+
+Returns the signed request.
+
+=back
+
+=cut
+
 sub sign_request {
     my $self = shift;
     my $request = shift || $self->request;
 
-    $self->sign($request);
+    confess "I don't have a request to sign" unless $request;
+
+    $self->sign($request) unless $self->has_signature;
 
     $request->header( 'Authorization' => $self->format_signature );
     return $request;
