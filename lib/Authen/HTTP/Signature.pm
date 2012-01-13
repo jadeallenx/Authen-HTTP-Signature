@@ -6,12 +6,9 @@ use warnings;
 
 use Moo;
 use Scalar::Util qw(blessed);
-use List::Util qw(first);
 use Carp qw(confess);
 
-use Digest::MD5 qw(md5_base64);
-
-with 'Authen::HTTP::Signature::Parse';
+use HTTP::Date qw(time2str);
 
 =head1 NAME
 
@@ -34,9 +31,11 @@ Create signatures:
     use File::Slurp qw(read_file);
     use HTTP::Request::Common;
 
-    my $c = Authen::HTTP::Signature->new(
-        private_key_callback => sub { read_file("/my/priv_key.pem") or die $!; },
-        key_id => 'Test',
+    my $key_string = read_file("/my/priv/key.pem") or die $!;
+
+    my $signer = Authen::HTTP::Signature->new(
+        key => $key_string,
+        key_id => 'MyKey',
     );
 
     my $req = POST('http://example.com/foo?param=value&pet=dog', 
@@ -47,30 +46,40 @@ Create signatures:
             Content => '{"hello": "world"}'
     );
 
-    my $signed_req = $c->sign_request($req); # signs the default 'Date' header with private_key
+    my $signed_req = $signer->sign($req); # signs the default 'Date' 
+                                          # header with private_key
+                                          # using RSA-SHA256 algorithm
+
 
 Validate signatures:
 
     use 5.010;
-    use Authen::HTTP::Signature;
+    use Authen::HTTP::Signature::Parser;
     use HTTP::Request::Common;
     use File::Slurp qw(read_file);
+    use Try::Tiny;
 
     my $req = POST('http://example.com/foo?param=value&pet=dog', 
             Content_Type => 'application/json',
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
             Date => 'Thu, 05 Jan 2012 21:31:40 GMT',
-            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
+            Authorization => q{Signature keyId="MyKey",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
             Content => '{"hello": "world"}'
     );
 
-    $c = Authen::HTTP::Signature->new( 
-        request => $req,
-        public_key_callback => sub{ read_file("/my/public/key.pem") },
-    );
+    my $p;
+    try {
+        $p = Authen::HTTP::Signature::Parser->new($req);
+    }
+    catch {
+        die "Parse failed: $_\n";
+    };
 
-    if ( $c->validate() ) {
+    my $key_string = read_file("/my/pub/key.pem") or die $!;
+    $p->key( $key_string );
+
+    if ( $p->verify() ) {
         say "Request is valid!"
     }
     else {
@@ -90,6 +99,9 @@ These are Perlish mutators; give an argument to set a value or no argument to ge
 =over
 
 =item algorithm
+
+The algorithm to use for signing. Read-only - once specified at object construction
+cannot be changed.
 
 One of:
 
@@ -111,12 +123,14 @@ One of:
 
 =back
 
+This value is used to compose the specific cryptography role (HMAC or RSA) into the class.
+
 =cut
 
 has 'algorithm' => (
-    is => 'rw',
+    is => 'ro',
     isa => sub { 
-        my $n = shift; 
+        my $n = lc shift; 
         confess "$n doesn't match any supported algorithm.\n" unless 
             scalar grep { $_ eq $n } qw(
                 rsa-sha1 
@@ -137,18 +151,14 @@ has 'algorithm' => (
 The list of headers to be signed (or already signed.) Defaults to the 'Date' header. The order of the headers 
 in this list will be used to build the order of the text in the signing string.
 
-This attribute can have some psuedo-values. These are:
+This attribute can have a psuedo-value. It is:
 
 =over
 
 =item * C<request-line>
 
-Use the text of the path and query from the request (e.g., C</foo?param=value&pet=dog>) as part of 
-the signing string.
-
-=item * C<all>
-
-Use all headers in a given request including C<request-line> itself in the signing string.
+Use the method, text of the path and query from the request, and the protocol version signature 
+(i.e., C<POST /foo?param=value&pet=dog HTTP/1.1>) as part of the signing string.
 
 =back
 
@@ -159,7 +169,7 @@ Use all headers in a given request including C<request-line> itself in the signi
 has 'headers' => (
     is => 'rw',
     isa => sub { confess "The 'headers' attribute expects an arrayref.\n" unless ref($_[0]) eq ref([]) },
-    default => sub { [ 'Date' ] },
+    default => sub { [ 'date' ] },
 );
 
 =over
@@ -212,7 +222,27 @@ has 'extensions' => (
 
 =over
 
+=item key
+
+The key to use for cryptographic operations.  The key type may have specific meaning based
+on the algorithm used. RSA requires private keys for signing and the corresponding public
+key for validation.  See the specific implementation module for more details about what this
+value should be.
+
+=back
+
+=cut
+
+has 'key' => (
+    is => 'rw',
+    predicate => 'has_key',
+);
+
+=over
+
 =item key_id
+
+Required.
 
 A means to identify the key being used to both sender and receiver. This can be any token which makes
 sense to the sender and receiver. The exact specification of a token and any necessary key management 
@@ -225,13 +255,15 @@ are outside the scope of this library.
 has 'key_id' => (
     is => 'rw',
     predicate => 'has_key_id',
+    required => 1,
 );
 
 =over
 
 =item request
 
-Holds the request to be parsed.
+Holds the request to be parsed. Should be some kind of 'Request' object with an interface to
+get/set headers.
 
 =back
 
@@ -239,23 +271,80 @@ Holds the request to be parsed.
 
 has 'request' => (
     is => 'rw',
-    isa => sub { confess ref($_[0]) . " isn't a HTTP::Request" unless blessed($_[0]) =~ /HTTP::Request/ },
+    isa => sub { confess "'request' argument isn't blessed" unless blessed($_[0]) },
     predicate => 'has_request',
 );
 
-around request => sub {
-    my $orig = shift;
-    my $r = shift;
+=over
 
-    unless( blessed($r) eq "HTTP::Request" ) {
-        if ( ! ref($r) ) {
-            $orig->request( HTTP::Request->parse($r) );
-        }
-        else {
-            confess "I don't know how to coerce " . ref($r);
-        }
-    }
-};
+=item get_header
+
+Expects a C<CODE> reference.  
+
+This callback represents the method to get header values from the object in the C<request> attribute. 
+
+The request will be the first parameter, and name of the header to fetch a value will be provided 
+as the second parameter to the callback.
+
+B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
+is the method, path and query portions of the request's URI and HTTP version string. 
+(For more information see the 
+L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
+
+=back
+
+=cut
+
+has 'get_header' => (
+    is => 'rw',
+    isa => sub { die "'get_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
+    predicate => 'has_get_header',
+    default => sub { 
+        my $self = shift;
+        my $request = shift;
+        my $name = shift;
+
+        $name eq 'request-line' ? 
+            sprintf("%s %s %s", 
+                $request->method,
+                $request->uri->path_query,
+                $request->protocol)
+            : $request->header($name);
+    },
+    lazy => 1,
+);
+
+=over
+
+=item set_header
+
+Expects a C<CODE> reference.
+
+This callback represents the way to set header values on the object in the C<request> attribute.
+
+The request will be the first parameter.  The name of the header and its value will be the second and
+third parameters.
+
+Returns the request object.
+
+=back
+
+=cut
+
+has 'set_header' => (
+    is => 'rw',
+    isa => sub { die "'set_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
+    predicate => 'has_set_header',
+    default => sub {
+        my $self = shift;
+        my ($request, $name, $value) = @_;
+
+        $request->header( $name => $value );
+
+        $request;
+    },
+    lazy => 1,
+);
 
 =over
 
@@ -273,122 +362,36 @@ has 'authorization_string' => (
     default => sub { 'Signature' },
 );
 
-=over
-
-=item header_callback
-
-Expects a C<CODE> reference.  
-
-This callback represents the method to get header values from the object in the C<request> attribute. 
-
-The request will be the first parameter, and name of the header to fetch a value will be provided 
-as the second parameter to the callback.
-
-B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
-is the path and query portions of the request's URI. (For more information see the 
-L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
-
-=back
-
-=cut
-
-has 'header_callback' => (
-    is => 'rw',
-    isa => sub { die "'header_callback' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
-    predicate => 'has_header_callback',
-    default => sub { 
-        my $self = shift;
-        my $request = shift;
-        my $header_name = shift;
-
-        $header_name eq 'request-line' ? $request->uri->path_query : $request->header($header_name);
-    },
-    lazy => 1,
-);
-
-=over 
-
-=item skew
-
-Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range, 
-the request is considered invalid.
-
-Set this value to 0 to disable skew checks for testing purposes.
-
-=back
-
-=cut
-
-has 'skew' => (
-    is => 'rw',
-    isa => sub { die "$_[0] isn't an integer" unless $_[0] =~ /0-9+/ },
-    default => sub { 300 },
-);
-
 =head1 METHODS
 
-The specific signature, validation, and signature header parsing methods are provided by various
-roles: L<Authen::HTTP::Signature::Method::HMAC>, L<Crypt::HTTP::Signature::Method::RSA>, 
-L<Authen::HTTP::Signature::Parse>.  Please see those roles' documentation for more information
-about them.
-
-=over 
-
-=item update_signing_string()
-
-This method updates a signing string using the contents of the C<headers> attribute.
-
-=back
-
 =cut
 
-# if we find the 'all' header value, explode to include all headers.
-sub _explode_headers {
+sub _update_signing_string {
     my $self = shift;
+    my $request = shift || $self->request;
 
-    if ( first { $_ eq 'all' } @{ $self->headers } ) {
-        my @all = $self->request->header->header_field_names;
-        unshift @all, 'request-line';
-        $self->headers( \@all );
-    }
-}
+    confess "I can't update the signing string because I don't have a request" unless $request;
+    confess "I can't update the signing string because I don't have a 'get_header' callback" unless $self->has_get_header;
 
-sub update_signing_string {
-    my $self = shift;
-
-    $self->_explode_headers();
-
-    confess "I can't update the signing string because I don't have a request" unless $self->has_request;
-    confess "I can't update the signing string because I don't have a header_callback" unless $self->has_header_callback;
-
-    my $ss = join "\n", map { $self->header_callback->($self->request, $_) or confess "Couldn't get header value for $_\n" } @{ $self->headers };
+    my $ss = join "\n", map { 
+        $self->get_header->($request, $_) 
+            or confess "Couldn't get header value for $_\n" } @{ $self->headers };
 
     $self->signing_string( $ss );
+     
+    return $ss;
 }
 
-=over
-
-=item format_signature()
-
-This method returns a formatted string ready to insert into an L<HTTP::Request> 
-object as the 'Authorization' header.
-
-=back
-
-=cut
-
-sub format_signature {
+sub _format_signature {
     my $self = shift;
     
-    $self->_explode_headers();
-
     my $rv = sprintf(q{%s keyId="%s",algorithm="%s"}, 
                 $self->authorization_string,
                 $self->key_id,
                 $self->algorithm
              );
 
-    if ( scalar @{ $self->headers } == 1 and $self->headers->[0] =~ /Date/i ) {
+    if ( scalar @{ $self->headers } == 1 and $self->headers->[0] =~ /^date$/i ) {
         # if there's only the default header, omit the headers param
     }
     else {
@@ -405,109 +408,97 @@ sub format_signature {
 
 }
 
+
 =over
 
-=item check_skew()
-
-The method checks if a signature is outside of the defined amount of clock skew. It understands all of the
-formats accepted by L<HTTP::Date>.
+=item sign()
 
 =back
 
 =cut
 
-sub check_skew {
+sub sign {
     my $self = shift;
 
-    if ( $self->skew ) {
-        my $request = shift || $self->request;
-        confess "No request found" unless $request;
-
-        my $header_time = str2time($self->header_callback->($request, 'date'));
-        confess "No Date header was returned (or could be parsed)" unless $header_time;
-
-        my $diff = abs(time - $header_time);
-        if ( $diff >= $self->skew ) {
-           confess "Request is outside of clock skew tolerance: $diff seconds computed, " . $self->skew . " seconds allowed.\n";
-        }
-    }
-
-    return 1;
-
-}
-
-=over
-
-=item sign_request()
-
-Uses the C<sign()> method and adds the C<Authorization> header to a request with a properly
-formatted signature line.
-
-Takes an optional L<HTTP::Request> object. The default input is the C<request> attribute.
-
-Returns a signed request with an updated 'Date' header.
-
-=back
-
-=cut
-
-sub sign_request {
-    my $self = shift;
     my $request = shift || $self->request;
-
     confess "I don't have a request to sign" unless $request;
 
-    $self->sign($request);
+    my $key = shift || $self->key;
+    confess "I don't have a key to use for signing" unless $key;
 
-    $request->header( 'Authorization' => $self->format_signature );
+    unless ( $self->get_header->($request, 'date') ) {
+        $self->set_header($request, 'date', time2str());
+    }
 
-    $self->request($request);
-}
+    $self->_update_signing_string($request);
 
-=over 
+    my $signer;
+    if ( $self->algorithm =~ /^rsa/ ) {
+        require Authen::HTTP::Signature::Method::RSA;
+        $signer = Authen::HTTP::Signature::Method::RSA->new(
+                    key => $key,
+                    data => $self->signing_string,
+                    hash => $self->algorithm
+        );
+    }
+    elsif ( $self->algorithm =~ /^hmac/ ) {
+        require Authen::HTTP::Signature::Method::HMAC;
+        $signer = Authen::HTTP::Signature::Method::HMAC->new(
+                    key => $key,
+                    data => $self->signing_string,
+                    hash => $self->algorithm
+        );
+    }
+    else {
+        confess "I don't know how to sign using " . $self->algorithm;
+    }
 
-=item update_date_header()
+    $self->signature( $signer->sign() );
 
-Updates the C<Date> header in a request with the current system GMT date and time.
+    $self->set_header->($request, 'Authorization', $self->format_signature);
 
-=back
-
-=cut
-
-sub update_date_header {
-    my $self = shift;
-    my $request = shift || $self->request;
-
-    $request->header->date(time);
-
-    $self->request($request);
+    return $request;
 }
 
 =over
 
-=item hash_request_content()
-
-Adds a C<Content-MD5> header to the request. Optionally takes a L<HTTP::Request> object; 
-it uses C<request> as its default input.
+=item verify()
 
 =back
 
 =cut
 
-sub hash_request_content {
+sub verify {
     my $self = shift;
-    my $request || $self->request;
 
-    return undef unless $request;
+    my $request = shift || $self->request;
+    confess "I don't have a request to verify" unless $request;
 
-    my $digest = md5_base64($request->content);
+    my $key = shift || $self->key;
+    confess "I don't have a key to use for verification" unless $key;
 
-    # Padding for Base64 interop
-    $digest .= '==';
+    my $v;
+    if ( $self->algorithm =~ /^rsa/ ) {
+        require Authen::HTTP::Signature::Method::RSA;
+        $v = Authen::HTTP::Signature::Method::RSA->new(
+                    key => $key,
+                    data => $self->signing_string,
+                    hash => $self->algorithm
+        );
+    }
+    elsif ( $self->algorithm =~ /^hmac/ ) {
+        require Authen::HTTP::Signature::Method::HMAC;
+        $v = Authen::HTTP::Signature::Method::HMAC->new(
+                    key => $key,
+                    data => $self->signing_string,
+                    hash => $self->algorithm
+        );
+    }
+    else {
+        confess "I don't know how to verify using " . $self->algorithm;
+    }
 
-    $request->header( 'Content-MD5' => $digest );
-
-    $self->request( $request );
+    return $v->verify($self->signature);
 }
 
 =head1 AUTHOR
@@ -516,7 +507,7 @@ Mark Allen, C<< <mrallen1 at yahoo.com> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-crypt-http-signature at rt.cpan.org>, or through
+Please report any bugs or feature requests to C<bug-authen-http-signature at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Authen-HTTP-Signature>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 
@@ -554,7 +545,7 @@ L<https://github.com/mrallen1/Authen-HTTP-Signature/>
 
 =head1 SEE ALSO
 
-L<Authen::HTTP::Signature::Parse>, 
+L<Authen::HTTP::Signature::Parser>, 
 L<Authen::HTTP::Signature::Method::HMAC>, 
 L<Authen::HTTP::Signature::Method::RSA>
 

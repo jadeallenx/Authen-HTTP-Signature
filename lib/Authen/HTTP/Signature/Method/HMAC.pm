@@ -18,7 +18,7 @@ our $VERSION = '0.01';
 
 =head1 PURPOSE
 
-This role uses a symmetric key to compute a HTTP signature digest. It implements the
+This class uses a symmetric key to compute a HTTP signature digest. It implements the
 HMAC-SHA{1, 256, 512} algorithms.
 
 =head1 ATTRIBUTES
@@ -27,34 +27,47 @@ These are Perlish mutators; pass a value to set it, pass no value to get the cur
 
 =over
 
-=item key_callback
-
-Expects a C<CODE> reference to be used to generate the key material for the digest. The C<key_id>
-will be passed as the first parameter to the callback.
-
-=back
-
-=cut
-
-has 'key_callback' => (
-    is => 'rw',
-    isa => sub { ref($_[0]) eq "CODE" },
-    predicate => 'has_key_callback',
-);
-
-=over
-
 =item key
 
-The key material. If this attribute has a value, it will be used. (No callback will be made.)
+Key material. Read-only. Required.
 
 =back
 
 =cut
 
 has 'key' => (
-    is => 'rw',
-    predicate => 'has_key'
+    is => 'ro',
+    required => 1,
+);
+
+=over
+
+=item data
+
+The data to be signed. Read-only. Required.
+
+=back
+
+=cut
+
+has 'data' => (
+    is => 'ro',
+    required => 1,
+);
+
+=over
+
+=item hash
+
+The algorithm to generate the digest. Read-only. Required.
+
+=back
+
+=cut
+
+has 'hash' => (
+    is => 'ro',
+    required => 1,
 );
 
 =head1 METHODS
@@ -102,13 +115,9 @@ sub _get_digest {
 
 =item sign()
 
-This method computes and returns a base 64 encoded digest of the C<signing_string> using the
-C<key> and C<algorithm>. The result is also stored as C<signature>. 
+Signs C<data> with C<key> using C<hash>.
 
-Takes an optional L<HTTP::Request> object.  The default input is the C<request> attribute.
-
-If the request does not already have a C<Date> header, this method adds one using the current GMT 
-system time.
+Returns a Base 64 encoded digest.
 
 =back
 
@@ -116,68 +125,39 @@ system time.
 
 sub sign {
     my $self = shift;
-    my $request = shift || $self->request;
 
-    confess "I don't have a request to sign" unless $request;
-
-    $self->update_date_header();
-    $self->update_signing_string();
- 
-    confess "How can I sign anything without a signing string?\n" unless $self->has_signing_string;
-    confess "How can I sign anything without a key?\n" if not $self->has_key_callback || not $self->has_key;
-
-    if ( ! $self->has_key ) {
-        $self->key ( $self->key_callback->($self->key_id) );
-    }
-
-    my $key = $self->key;
-    confess "I don't have a key!" unless $key;
-
-    $self->signature( $self->_generate_signature($key) );
+    return $self->_generate_signature();
 }
 
 sub _generate_signature {
     my $self = shift;
-    my $key = shift;
 
     return $self->_pad_base64( 
         $self->_get_digest(
-            $self->algorithm,
-            $self->signing_string,
-            $key
+            $self->hash,
+            $self->data,
+            $self->key
         )
     );
 }
 
 =over
 
-=item validate()
+=item verify()
 
-This method compares a candidate signature to a computed signature.  Returns a boolean value.
+Compares the given signature to a computed one.  Returns true if they are the same. False otherwise.
 
 =back
 
 =cut
 
-sub validate {
+sub verify {
     my $self = shift;
-
-    $self->check_skew();
-
-    my $candidate = $self->signature;
+    my $candidate = shift;
 
     confess "How can I validate anything without a signature?" unless $candidate;
-    confess "How can I validate anything without a signing string?" unless $self->has_signing_string;
-    confess "How can I validate anything without a key?" unless ( $self->has_key_callback || $self->has_key );
 
-    if ( ! $self->has_key ) {
-        $self->key ( $self->key_callback->($self->key_id) );
-    }
-
-    my $key = $self->key;
-    confess "I don't have a key!" unless $key;
-
-    return $self->_generate_signature( $key ) eq $candidate;
+    return $self->_generate_signature() eq $candidate;
 }
 
 =head1 SEE ALSO
