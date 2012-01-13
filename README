@@ -1,15 +1,7 @@
-Crypt-HTTP-Signature
+Authen-HTTP-Signature
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+Version: 0.01
 
-A README file is required for CPAN modules since CPAN extracts the README
-file from a module distribution so that people browsing the archive
-can use it to get an idea of the module's uses. It is usually a good idea
-to provide version information here so that people can decide whether
-fixes for the module are worth downloading.
 
 
 INSTALLATION
@@ -26,21 +18,24 @@ SUPPORT AND DOCUMENTATION
 After installing, you can find documentation for this module with the
 perldoc command.
 
-    perldoc Crypt::HTTP::Signature
+    perldoc Authen::HTTP::Signature
 
 You can also look for information at:
 
     RT, CPAN's request tracker (report bugs here)
-        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Crypt-HTTP-Signature
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Authen-HTTP-Signature
 
     AnnoCPAN, Annotated CPAN documentation
-        http://annocpan.org/dist/Crypt-HTTP-Signature
+        http://annocpan.org/dist/Authen-HTTP-Signature
 
     CPAN Ratings
-        http://cpanratings.perl.org/d/Crypt-HTTP-Signature
+        http://cpanratings.perl.org/d/Authen-HTTP-Signature
 
-    Search CPAN
-        http://search.cpan.org/dist/Crypt-HTTP-Signature/
+    MetaCPAN
+        https://www.metacpan.org/dist/Authen-HTTP-Signature
+
+    Git Hub
+        https://github.com/mrallen1/Authen-HTTP-Signature
 
 
 LICENSE AND COPYRIGHT

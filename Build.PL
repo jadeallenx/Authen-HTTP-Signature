@@ -4,10 +4,10 @@ use warnings;
 use Module::Build;
 
 my $builder = Module::Build->new(
-    module_name         => 'Crypt::HTTP::Signature',
+    module_name         => 'Authen::HTTP::Signature',
     license             => 'perl',
     dist_author         => q{Mark Allen <mrallen1@yahoo.com>},
-    dist_version_from   => 'lib/Crypt/HTTP/Signature.pm',
+    dist_version_from   => 'lib/Authen/HTTP/Signature.pm',
     build_requires => {
         'Test::More' => 0,
         'Test::Fatal' => 0,
@@ -21,11 +21,11 @@ my $builder = Module::Build->new(
         'MIME::Base64' => '3.13',
         'Moo' => '0.009013',
     },
-    add_to_cleanup      => [ 'Crypt-HTTP-Signature-*' ],
+    add_to_cleanup      => [ 'Authen-HTTP-Signature-*' ],
     create_makefile_pl => 'traditional',
     meta_merge => {
         resources => {
-            repository => 'https://github.com/mrallen1/Crypt-HTTP-Signature',
+            repository => 'https://github.com/mrallen1/Authen-HTTP-Signature',
         },
     },
     

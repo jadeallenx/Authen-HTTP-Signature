@@ -1,4 +1,4 @@
-package Crypt::HTTP::Signature::Method::HMAC;
+package Authen::HTTP::Signature::Method::HMAC;
 
 use 5.010;
 use warnings;
@@ -10,7 +10,7 @@ use Carp qw(confess);
 
 =head1 NAME
 
-Crypt::HTTP::Signature::Method::HMAC - Compute digest using a symmetric key
+Authen::HTTP::Signature::Method::HMAC - Compute digest using a symmetric key
 
 =cut
 
@@ -182,7 +182,7 @@ sub validate {
 
 =head1 SEE ALSO
 
-L<Crypt::HTTP::Signature>
+L<Authen::HTTP::Signature>
 
 =cut
 

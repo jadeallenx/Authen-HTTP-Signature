@@ -1,4 +1,4 @@
-package Crypt::HTTP::Signature::Method::RSA;
+package Authen::HTTP::Signature::Method::RSA;
 
 use strict;
 use warnings;

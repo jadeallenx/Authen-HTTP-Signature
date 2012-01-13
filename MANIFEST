@@ -1,6 +1,9 @@
 Build.PL
 Changes
-lib/Crypt/HTTP/Signature.pm
+lib/Authen/HTTP/Signature.pm
+lib/Authen/HTTP/Signature/Parse.pm
+lib/Authen/HTTP/Signature/Method/RSA.pm
+lib/Authen/HTTP/Signature/Method/HMAC.pm
 MANIFEST			This list of files
 README
 t/00-load.t

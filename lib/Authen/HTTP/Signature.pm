@@ -1,4 +1,4 @@
-package Crypt::HTTP::Signature;
+package Authen::HTTP::Signature;
 
 use 5.010;
 use strict;
@@ -11,11 +11,11 @@ use Carp qw(confess);
 
 use Digest::MD5 qw(md5_base64);
 
-with 'Crypt::HTTP::Signature::Parse';
+with 'Authen::HTTP::Signature::Parse';
 
 =head1 NAME
 
-Crypt::HTTP::Signature - Sign and validate HTTP headers
+Authen::HTTP::Signature - Sign and validate HTTP headers
 
 =head1 VERSION
 
@@ -30,11 +30,11 @@ our $VERSION = '0.01';
 Create signatures:
 
     use 5.010;
-    use Crypt::HTTP::Signature;
+    use Authen::HTTP::Signature;
     use File::Slurp qw(read_file);
     use HTTP::Request::Common;
 
-    my $c = Crypt::HTTP::Signature->new(
+    my $c = Authen::HTTP::Signature->new(
         private_key_callback => sub { read_file("/my/priv_key.pem") or die $!; },
         key_id => 'Test',
     );
@@ -52,7 +52,7 @@ Create signatures:
 Validate signatures:
 
     use 5.010;
-    use Crypt::HTTP::Signature;
+    use Authen::HTTP::Signature;
     use HTTP::Request::Common;
     use File::Slurp qw(read_file);
 
@@ -65,7 +65,7 @@ Validate signatures:
             Content => '{"hello": "world"}'
     );
 
-    $c = Crypt::HTTP::Signature->new( 
+    $c = Authen::HTTP::Signature->new( 
         request => $req,
         public_key_callback => sub{ read_file("/my/public/key.pem") },
     );
@@ -328,8 +328,8 @@ has 'skew' => (
 =head1 METHODS
 
 The specific signature, validation, and signature header parsing methods are provided by various
-roles: L<Crypt::HTTP::Signature::Method::HMAC>, L<Crypt::HTTP::Signature::Method::RSA>, 
-L<Crypt::HTTP::Signature::Parse>.  Please see those roles' documentation for more information
+roles: L<Authen::HTTP::Signature::Method::HMAC>, L<Crypt::HTTP::Signature::Method::RSA>, 
+L<Authen::HTTP::Signature::Parse>.  Please see those roles' documentation for more information
 about them.
 
 =over 
@@ -517,14 +517,14 @@ Mark Allen, C<< <mrallen1 at yahoo.com> >>
 =head1 BUGS
 
 Please report any bugs or feature requests to C<bug-crypt-http-signature at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Crypt-HTTP-Signature>.  I will be notified, and then you'll
+the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Authen-HTTP-Signature>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 
 =head1 SUPPORT
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc Crypt::HTTP::Signature
+    perldoc Authen::HTTP::Signature
 
 You can also look for information at:
 
@@ -532,31 +532,31 @@ You can also look for information at:
 
 =item * RT: CPAN's request tracker (report bugs here)
 
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Crypt-HTTP-Signature>
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Authen-HTTP-Signature>
 
 =item * AnnoCPAN: Annotated CPAN documentation
 
-L<http://annocpan.org/dist/Crypt-HTTP-Signature>
+L<http://annocpan.org/dist/Authen-HTTP-Signature>
 
 =item * CPAN Ratings
 
-L<http://cpanratings.perl.org/d/Crypt-HTTP-Signature>
+L<http://cpanratings.perl.org/d/Authen-HTTP-Signature>
 
 =item * MetaCPAN
 
-L<https://metacpan.org/dist/Crypt-HTTP-Signature/>
+L<https://metacpan.org/dist/Authen-HTTP-Signature/>
 
 =item * GitHub
 
-L<https://github.com/mrallen1/Crypt-HTTP-Signature/>
+L<https://github.com/mrallen1/Authen-HTTP-Signature/>
 
 =back
 
 =head1 SEE ALSO
 
-L<Crypt::HTTP::Signature::Parse>, 
-L<Crypt::HTTP::Signature::Method::HMAC>, 
-L<Crypt::HTTP::Signature::Method::RSA>
+L<Authen::HTTP::Signature::Parse>, 
+L<Authen::HTTP::Signature::Method::HMAC>, 
+L<Authen::HTTP::Signature::Method::RSA>
 
 L<Joyent's HTTP Signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>
 
@@ -572,4 +572,4 @@ See http://dev.perl.org/licenses/ for more information.
 
 =cut
 
-1; # End of Crypt::HTTP::Signature
+1; # End of Authen::HTTP::Signature

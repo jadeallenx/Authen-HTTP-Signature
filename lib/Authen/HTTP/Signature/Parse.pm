@@ -1,4 +1,4 @@
-package Crypt::HTTP::Signature::Parse;
+package Authen::HTTP::Signature::Parse;
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use Carp qw(confess);
 
 =head1 NAME
 
-Crypt::HTTP::Signature::Parse - Parse HTTP signature headers
+Authen::HTTP::Signature::Parse - Parse HTTP signature headers
 
 =cut
 
@@ -18,7 +18,7 @@ our $VERSION = '0.01';
 =head1 PURPOSE
 
 This role parses a HTTP signature 'Authorization' header (if one exists) from a L<HTTP::Request> 
-object and populates attributes in a L<Crypt::HTTP::Signature> object.
+object and populates attributes in a L<Authen::HTTP::Signature> object.
 
 =head1 METHOD
 
@@ -89,7 +89,7 @@ sub parse {
 
 =head1 SEE ALSO
 
-L<Crypt::HTTP::Signature>
+L<Authen::HTTP::Signature>
 
 =cut
 
