@@ -37,6 +37,7 @@ The request to be parsed.
 has 'request' => (
     is => 'rw',
     isa => sub { confess "'request' must be blessed" unless blessed($_[0]) },
+    predicate => 'has_request',
 );
 
 around BUILDARGS => sub {
@@ -48,6 +49,12 @@ around BUILDARGS => sub {
     }
 
     return $class->$orig(@_);
+};
+
+sub BUILD {
+    my $self = shift;
+
+    $self->parse() if $self->has_request();
 }
 
 =over
@@ -66,14 +73,13 @@ has 'get_header' => (
     predicate => 'has_get_header',
     default => sub { 
         sub {
-            confess "Didn't get 3 arguments" unless @_ == 3;
-            my $self = shift;
+            confess "Didn't get 2 arguments" unless @_ == 2;
             my $request = shift;
+            confess "'request' isn't blessed" unless blessed $request;
             my $name = shift;
 
             $name eq 'request-line' ? 
-                sprintf("%s %s %s", 
-                    $request->method,
+                sprintf("%s %s", 
                     $request->uri->path_query,
                     $request->protocol)
                 : $request->header($name);
@@ -97,7 +103,7 @@ Set this value to 0 to disable skew checks for testing purposes.
 
 has 'skew' => (
     is => 'rw',
-    isa => sub { die "$_[0] isn't an integer" unless $_[0] =~ /0-9+/ },
+    isa => sub { die "$_[0] isn't an integer" unless $_[0] =~ /[0-9]+/ },
     default => sub { 300 },
 );
 
@@ -124,10 +130,7 @@ sub parse {
 
     $self->_check_skew($request);
 
-    # Should look something like:
-    # Authorization: Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=
-
-    my ( $sig_text, $params, $b64_str ) = split / /, $sig_str;
+    my ( $sig_text, $params, $b64_str ) = $sig_str =~ /(Signature)\s+(keyId=".+")\s+(.+)$/;
 
     confess "$sig_text does not match required string 'Signature'" unless $sig_text =~ /^Signature$/;
 
@@ -135,10 +138,13 @@ sub parse {
 
     $key_id =~ s/^keyId="(.+)"$/$1/;
     $algo =~ s/^algorithm="(.+)"$/$1/;
-    $hdrs =~ s/^headers="(.+)"$/$1/;
-    $ext =~ s/^ext="(.+)"$/$1/;
+    $ext =~ s/^ext="(.+)"$/$1/ if $ext;
 
-    my @headers = split / /, $hdrs;
+    my @headers;
+    if ( $hdrs ) {
+        $hdrs =~ s/^headers="(.+)"$/$1/;
+        @headers = split / /, $hdrs;
+    }
 
     push @headers, "date" unless @headers;
 

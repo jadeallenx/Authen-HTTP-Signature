@@ -35,13 +35,13 @@ a private or public key.
 If the operation is C<sign()>, then this attribute must hold a private key. 
 In other words, the string this attribute holds should start with
 
-  ----BEGIN RSA PRIVATE KEY----
+  -----BEGIN RSA PRIVATE KEY-----
 
 
 If the operation is C<verify()>, then this attribute must hold a public key. 
 In other words, the string this attribute holds should start with
 
-  ----BEGIN RSA PUBLIC KEY----
+  -----BEGIN PUBLIC KEY-----
 
 =back
 
@@ -107,7 +107,8 @@ sub sign {
 
     my $s = $key->sign($self->data);
 
-    return encode_base64($s);
+    # pass empty string as second arg to prevent line breaks in stream
+    return encode_base64($s, "");
 }
 
 sub _set_digest {

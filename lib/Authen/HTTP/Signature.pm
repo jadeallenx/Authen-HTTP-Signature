@@ -36,7 +36,7 @@ Create signatures:
 
     my $signer = Authen::HTTP::Signature->new(
         key => $key_string,
-        key_id => 'MyKey',
+        key_id => 'Test',
     );
 
     my $req = POST('http://example.com/foo?param=value&pet=dog', 
@@ -47,10 +47,11 @@ Create signatures:
             Content => '{"hello": "world"}'
     );
 
-    my $signed_req = $signer->sign($req); # signs the default 'Date' 
-                                          # header with private_key
-                                          # using RSA-SHA256 algorithm
+    my $signed_req = $signer->sign($req); 
 
+    # signs the default 'Date' header with key using the
+    # RSA-SHA256 algorithm and adds 'Authorization' header to 
+    # $req
 
 Validate signatures:
 
@@ -65,7 +66,7 @@ Validate signatures:
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
             Date => 'Thu, 05 Jan 2012 21:31:40 GMT',
-            Authorization => q{Signature keyId="MyKey",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
+            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
             Content => '{"hello": "world"}'
     );
 
@@ -159,7 +160,7 @@ This attribute can have a psuedo-value. It is:
 =item * C<request-line>
 
 Use the method, text of the path and query from the request, and the protocol version signature 
-(i.e., C<POST /foo?param=value&pet=dog HTTP/1.1>) as part of the signing string.
+(i.e., C</foo?param=value&pet=dog HTTP/1.1>) as part of the signing string.
 
 =back
 
@@ -288,7 +289,7 @@ The request will be the first parameter, and name of the header to fetch a value
 as the second parameter to the callback.
 
 B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
-is the method, path and query portions of the request's URI and HTTP version string. 
+is the path and query portions of the request's URI and HTTP version string. 
 (For more information see the 
 L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
 
@@ -302,14 +303,13 @@ has 'get_header' => (
     predicate => 'has_get_header',
     default => sub { 
         sub {
-            confess "Didn't get 3 arguments" unless @_ == 3;
-            my $self = shift;
+            confess "Didn't get 2 arguments" unless @_ == 2;
             my $request = shift;
+            confess "'request' isn't blessed" unless blessed $request;
             my $name = shift;
 
             $name eq 'request-line' ? 
-                sprintf("%s %s %s", 
-                    $request->method,
+                sprintf("%s %s", 
                     $request->uri->path_query,
                     $request->protocol)
                 : $request->header($name);
@@ -341,9 +341,9 @@ has 'set_header' => (
     predicate => 'has_set_header',
     default => sub {
         sub {
-            confess "Didn't get 4 arguments" unless @_ == 4;
-            my $self = shift;
+            confess "Didn't get 3 arguments" unless @_ == 3;
             my ($request, $name, $value) = @_;
+            confess "'request' isn't blessed" unless blessed $request;
 
             $request->header( $name => $value );
 
@@ -402,11 +402,11 @@ sub _format_signature {
         # if there's only the default header, omit the headers param
     }
     else {
-        $rv .= q{,headers="} . join " ", lc @{$self->headers} . q{"};
+        $rv .= q{,headers="} . lc(join " ", @{$self->headers}) . q{"};
     }
 
-    if ( $self->has_extentions ) {
-        $rv .= q{,ext="} . $self->extentsions . q{"};
+    if ( $self->has_extensions ) {
+        $rv .= q{,ext="} . $self->extensions . q{"};
     }
 
     $rv .= q{ } . $self->signature;
@@ -462,7 +462,7 @@ sub sign {
 
     $self->signature( $signer->sign() );
 
-    $self->set_header->($request, 'Authorization', $self->format_signature);
+    $self->set_header->($request, 'Authorization', $self->_format_signature);
 
     return $request;
 }
