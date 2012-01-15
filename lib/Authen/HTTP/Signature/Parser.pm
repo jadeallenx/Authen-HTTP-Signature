@@ -65,16 +65,19 @@ has 'get_header' => (
     isa => sub { die "'get_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
     predicate => 'has_get_header',
     default => sub { 
-        my $self = shift;
-        my $request = shift;
-        my $name = shift;
+        sub {
+            confess "Didn't get 3 arguments" unless @_ == 3;
+            my $self = shift;
+            my $request = shift;
+            my $name = shift;
 
-        $name eq 'request-line' ? 
-            sprintf("%s %s %s", 
-                $request->method,
-                $request->uri->path_query,
-                $request->protocol)
-            : $request->header($name);
+            $name eq 'request-line' ? 
+                sprintf("%s %s %s", 
+                    $request->method,
+                    $request->uri->path_query,
+                    $request->protocol)
+                : $request->header($name);
+        };
     },
     lazy => 1,
 );
