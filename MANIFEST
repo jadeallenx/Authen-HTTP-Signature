@@ -1,7 +1,7 @@
 Build.PL
 Changes
 lib/Authen/HTTP/Signature.pm
-lib/Authen/HTTP/Signature/Parse.pm
+lib/Authen/HTTP/Signature/Parser.pm
 lib/Authen/HTTP/Signature/Method/RSA.pm
 lib/Authen/HTTP/Signature/Method/HMAC.pm
 MANIFEST			This list of files
