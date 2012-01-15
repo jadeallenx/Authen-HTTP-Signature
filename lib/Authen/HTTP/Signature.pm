@@ -9,6 +9,7 @@ use Scalar::Util qw(blessed);
 use Carp qw(confess);
 
 use HTTP::Date qw(time2str);
+use Data::Dumper;
 
 =head1 NAME
 
@@ -300,16 +301,19 @@ has 'get_header' => (
     isa => sub { die "'get_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
     predicate => 'has_get_header',
     default => sub { 
-        my $self = shift;
-        my $request = shift;
-        my $name = shift;
+        sub {
+            confess "Didn't get 3 arguments" unless @_ == 3;
+            my $self = shift;
+            my $request = shift;
+            my $name = shift;
 
-        $name eq 'request-line' ? 
-            sprintf("%s %s %s", 
-                $request->method,
-                $request->uri->path_query,
-                $request->protocol)
-            : $request->header($name);
+            $name eq 'request-line' ? 
+                sprintf("%s %s %s", 
+                    $request->method,
+                    $request->uri->path_query,
+                    $request->protocol)
+                : $request->header($name);
+        };
     },
     lazy => 1,
 );
@@ -336,12 +340,15 @@ has 'set_header' => (
     isa => sub { die "'set_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
     predicate => 'has_set_header',
     default => sub {
-        my $self = shift;
-        my ($request, $name, $value) = @_;
+        sub {
+            confess "Didn't get 4 arguments" unless @_ == 4;
+            my $self = shift;
+            my ($request, $name, $value) = @_;
 
-        $request->header( $name => $value );
+            $request->header( $name => $value );
 
-        $request;
+            $request;
+        };
     },
     lazy => 1,
 );
@@ -427,7 +434,7 @@ sub sign {
     confess "I don't have a key to use for signing" unless $key;
 
     unless ( $self->get_header->($request, 'date') ) {
-        $self->set_header($request, 'date', time2str());
+        $self->set_header->($request, 'date', time2str());
     }
 
     $self->_update_signing_string($request);
