@@ -306,7 +306,7 @@ has 'get_header' => (
             confess "Didn't get 2 arguments" unless @_ == 2;
             my $request = shift;
             confess "'request' isn't blessed" unless blessed $request;
-            my $name = shift;
+            my $name = lc(shift);
 
             $name eq 'request-line' ? 
                 sprintf("%s %s", 

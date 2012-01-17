@@ -51,12 +51,6 @@ around BUILDARGS => sub {
     return $class->$orig(@_);
 };
 
-sub BUILD {
-    my $self = shift;
-
-    $self->parse() if $self->has_request();
-}
-
 =over
 
 =item get_header
@@ -130,19 +124,32 @@ sub parse {
 
     $self->_check_skew($request);
 
-    my ( $sig_text, $params, $b64_str ) = $sig_str =~ /(Signature)\s+(keyId=".+")\s+(.+)$/;
+    my ( $sig_text ) = $sig_str =~ /^(Signature).*$/;
+    confess "does not match required string 'Signature'" unless $sig_text;
 
-    confess "$sig_text does not match required string 'Signature'" unless $sig_text =~ /^Signature$/;
+    my ( $params ) = $sig_str =~ /^Signature\s+(keyId=".*").*$/;
+    confess "No parameters found!" unless $params;
 
-    my ( $key_id, $algo, $hdrs, $ext ) = split /,/, $params;
+    my ( $b64_str ) = $sig_str =~ /^.*"\s+(\S+)$/;
+    confess "No signature data found!" unless $b64_str;
 
-    $key_id =~ s/^keyId="(.+)"$/$1/;
-    $algo =~ s/^algorithm="(.+)"$/$1/;
-    $ext =~ s/^ext="(.+)"$/$1/ if $ext;
+    # Probably ought to use a module here, but...
+    #
+    # Positive lookbehind and positive lookahead in split
+    # http://www.effectiveperlprogramming.com/blog/1411
+
+    my ( $key_id, $algo, $hdrs, $ext ) = split /(?<="),(?=[ahe])/, $params;
+
+    $key_id =~ s/^keyId="(.*)"$/$1/;
+    $algo =~ s/^algorithm="(.*)"$/$1/;
+    $ext =~ s/^ext="(.*)"/$1/ if $ext;
+
+    confess "No key id found!" unless $key_id;
+    confess "No algorithm found" unless $algo;
 
     my @headers;
     if ( $hdrs ) {
-        $hdrs =~ s/^headers="(.+)"$/$1/;
+        $hdrs =~ s/^headers="(.*)"$/$1/;
         @headers = split / /, $hdrs;
     }
 
@@ -157,6 +164,9 @@ sub parse {
         $h{$hdr}++;
     }
 
+    # normalize headers to lower-case
+    @headers = map { lc } @headers;
+
     my $ss = join "\n", map { 
         $self->get_header->($request, $_) 
             or confess "Couldn't get header value for $_\n" } @headers;
@@ -166,7 +176,7 @@ sub parse {
         headers        => \@headers,
         signing_string => $ss,
         algorithm      => $algo,
-        extentions     => $ext,
+        extensions     => $ext,
         signature      => $b64_str,
         request        => $request,
     );

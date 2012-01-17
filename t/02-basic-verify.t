@@ -32,7 +32,7 @@ use HTTP::Request;
 my $req = HTTP::Request->parse($reqstr);
 $req->header(Authorization => $default);
 
-my $exception = exception { Authen::HTTP::Signature::Parser->new($req) };
+my $exception = exception { Authen::HTTP::Signature::Parser->new($req)->parse() };
 like($exception, qr/skew/, "clock skew error");
 
 my $pr = Authen::HTTP::Signature::Parser->new(
