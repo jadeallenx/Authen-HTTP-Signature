@@ -5,13 +5,13 @@ lib/Authen/HTTP/Signature/Parser.pm
 lib/Authen/HTTP/Signature/Method/RSA.pm
 lib/Authen/HTTP/Signature/Method/HMAC.pm
 MANIFEST			This list of files
+MANIFEST.SKIP
 README
 t/00-load.t
-t/all_hdr.txt
-t/default_hdr.txt
+t/01-basic-sign.t
+t/02-basic-verify.t
+t/03-hmac.t
+t/04-parser.t
 t/manifest.t
-t/pod-coverage.t
 t/pod.t
-t/rsa_private.pem
-t/rsa_public.pem
-t/test_request.txt
+
