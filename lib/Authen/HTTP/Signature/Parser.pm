@@ -15,11 +15,11 @@ Authen::HTTP::Signature::Parser - Parse HTTP signature headers
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 PURPOSE
 
-This class parses a HTTP signature 'Authorization' header (if one exists) from a L<HTTP::Request> 
+This class parses a HTTP signature 'Authorization' header (if one exists) from a request
 object and populates attributes in a L<Authen::HTTP::Signature> object.
 
 =head1 ATTRIBUTES
@@ -101,7 +101,10 @@ has 'skew' => (
     default => sub { 300 },
 );
 
+
 =head1 METHOD
+
+Errors are fatal.
 
 =over
 

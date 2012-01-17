@@ -14,4 +14,7 @@ t/03-hmac.t
 t/04-parser.t
 t/manifest.t
 t/pod.t
-
+t/version.t
+Makefile.PL
+META.yml
+META.json

@@ -1,5 +1,9 @@
 Revision history for Authen-HTTP-Signature
 
+0.02    2012-01-17
+        Documentation updates
+        Fix parameter handling on verify()
+
 0.01    2012-01-17
         First version
 

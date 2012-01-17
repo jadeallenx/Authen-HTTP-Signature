@@ -14,7 +14,7 @@ Authen::HTTP::Signature::Method::HMAC - Compute digest using a symmetric key
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 PURPOSE
 

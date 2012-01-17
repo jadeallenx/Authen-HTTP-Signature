@@ -1,6 +1,6 @@
 Authen-HTTP-Signature
 
-Version: 0.01
+Version: 0.02
 
 This is an implementation of Joyent’s HTTP signature authentication
 scheme. The idea is to authenticate connections (over HTTPS ideally)

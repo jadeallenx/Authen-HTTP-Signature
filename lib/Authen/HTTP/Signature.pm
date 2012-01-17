@@ -17,11 +17,11 @@ Authen::HTTP::Signature - Sign and validate HTTP headers
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
@@ -43,14 +43,13 @@ Create signatures:
             Content_Type => 'application/json',
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
-            Date => 'Thu, 05 Jan 2012 21:31:40 GMT',
             Content => '{"hello": "world"}'
     );
 
     my $signed_req = $signer->sign($req); 
 
-    # signs the default 'Date' header with key using the
-    # RSA-SHA256 algorithm and adds 'Authorization' header to 
+    # adds then signs the 'Date' header with private key using 
+    # RSA-SHA256, then adds 'Authorization' header to 
     # $req
 
 Validate signatures:
@@ -72,7 +71,7 @@ Validate signatures:
 
     my $p;
     try {
-        $p = Authen::HTTP::Signature::Parser->new($req);
+        $p = Authen::HTTP::Signature::Parser->new($req)->parse();
     }
     catch {
         die "Parse failed: $_\n";
@@ -94,6 +93,8 @@ This is an implementation of Joyent's HTTP signature authentication scheme. The 
 connections (over HTTPS ideally) using either an RSA keypair or a symmetric key by signing a set of header 
 values.
 
+If you wish to use SSH keys for validation as in Joyent's proposal, check out L<Convert::SSH2>.
+
 =head1 ATTRIBUTES
 
 These are Perlish mutators; give an argument to set a value or no argument to get the current value.
@@ -102,8 +103,7 @@ These are Perlish mutators; give an argument to set a value or no argument to ge
 
 =item algorithm
 
-The algorithm to use for signing. Read-only - once specified at object construction
-cannot be changed.
+The algorithm to use for signing. Read-only.
 
 One of:
 
@@ -124,8 +124,6 @@ One of:
 =back
 
 =back
-
-This value is used to compose the specific cryptography role (HMAC or RSA) into the class.
 
 =cut
 
@@ -210,7 +208,7 @@ has 'signature' => (
 =item extensions
 
 There are currently no extentions implemented by this library, but the library will append extension
-information to the generated header data if this attribute has one or more values.
+information to the generated header data if this attribute has a value.
 
 =back
 
@@ -371,6 +369,8 @@ has 'authorization_string' => (
 
 =head1 METHODS
 
+Errors are generally fatal. Use L<Try::Tiny> for more graceful error handling.
+
 =cut
 
 sub _update_signing_string {
@@ -415,10 +415,22 @@ sub _format_signature {
 
 }
 
-
 =over
 
 =item sign()
+
+This method takes signs the values of the specified C<headers> using C<algorithm> and C<key>.
+
+By default, it uses C<request> as its input. You may optionally pass a request object and it
+will use that instead.  By default, it uses C<key>. You may optionally pass key material and it
+will use that instead.
+
+It will add a C<Date> header to the C<request> if there isn't already one in the request
+object.
+
+It adds a C<Authorization> header with the appropriate signature data.
+
+The return value is a signed request object.
 
 =back
 
@@ -471,6 +483,13 @@ sub sign {
 
 =item verify()
 
+This method verifies that a signature on a request is valid. 
+
+By default it uses C<key>.  You may optionally pass in key material and it
+will use that instead.
+
+Returns a boolean.
+
 =back
 
 =cut
@@ -478,11 +497,11 @@ sub sign {
 sub verify {
     my $self = shift;
 
-    my $request = shift || $self->request;
-    confess "I don't have a request to verify" unless $request;
-
     my $key = shift || $self->key;
     confess "I don't have a key to use for verification" unless $key;
+
+    confess "I don't have a signing string" unless $self->has_signing_string;
+    confess "I don't have a signature" unless $self->has_signature;
 
     my $v;
     if ( $self->algorithm =~ /^rsa/ ) {
