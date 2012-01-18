@@ -141,7 +141,7 @@ sub parse {
     # Positive lookbehind and positive lookahead in split
     # http://www.effectiveperlprogramming.com/blog/1411
 
-    my ( $key_id, $algo, $hdrs, $ext ) = split /(?<="),(?=[ahe])/, $params;
+    my ( $key_id, $algo, $hdrs, $ext ) = split /(?<="),(?=[ahe].+=)/, $params;
 
     $key_id =~ s/^keyId="(.*)"$/$1/;
     $algo =~ s/^algorithm="(.*)"$/$1/;
