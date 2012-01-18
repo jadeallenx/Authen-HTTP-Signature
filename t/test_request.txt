@@ -1,8 +1,0 @@
-POST /foo?param=value&pet=dog HTTP/1.1
-Host: example.com
-Date: Thu, 05 Jan 2012 21:31:40 GMT
-Content-Type: application/json
-Content-MD5: Sd/dVLAcvNLSq16eXua5uQ==
-Content-Length: 18
-
-{"hello": "world"}

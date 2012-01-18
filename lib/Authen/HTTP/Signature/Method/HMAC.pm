@@ -4,7 +4,7 @@ use 5.010;
 use warnings;
 use strict;
 
-use Moo::Role;
+use Moo;
 use Digest::SHA qw(hmac_sha1_base64 hmac_sha256_base64 hmac_sha512_base64);
 use Carp qw(confess);
 
@@ -14,7 +14,7 @@ Authen::HTTP::Signature::Method::HMAC - Compute digest using a symmetric key
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 PURPOSE
 
