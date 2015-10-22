@@ -115,16 +115,14 @@ sub _set_digest {
     my $self = shift;
     my $key = shift;
 
-    for ( $self->hash ) {
-        when ( /sha1/ ) {
-            $key->use_sha1_hash();
-        }
-        when ( /sha256/ ) {
-            $key->use_sha256_hash();
-        }
-        when ( /sha512/ ) {
-            $key->use_sha512_hash();
-        }
+    if ( $self->hash =~ /sha1/ ) {
+        $key->use_sha1_hash();
+    }
+    elsif ( $self->hash =~ /sha256/ ) {
+        $key->use_sha256_hash();
+    }
+    elsif ( $self->hash =~ /sha512/ ) {
+        $key->use_sha512_hash();
     }
 }
 

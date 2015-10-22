@@ -94,16 +94,14 @@ sub _get_digest {
     my $key = shift;
 
     my $digest;
-    for ( $algo ) {
-        when ( /sha1/ ) {
-            $digest = hmac_sha1_base64($data, $key);
-        }
-        when ( /sha256/ ) {
-            $digest = hmac_sha256_base64($data, $key);
-        }
-        when ( /sha512/ ) {
-            $digest = hmac_sha512_base64($data, $key);
-        }
+    if ( $algo =~ /sha1/ ) {
+        $digest = hmac_sha1_base64($data, $key);
+    }
+    elsif ( $algo =~ /sha256/ ) {
+        $digest = hmac_sha256_base64($data, $key);
+    }
+    elsif ( $algo =~ /sha512/ ) {
+        $digest = hmac_sha512_base64($data, $key);
     }
 
     confess "I couldn't get a $algo digest\n" unless defined $digest && length $digest;
