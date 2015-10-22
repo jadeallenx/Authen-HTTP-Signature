@@ -1,8 +1,8 @@
 Authen-HTTP-Signature
 
-Version: 0.02
+Version: 0.03
 
-This is an implementation of Joyent’s HTTP signature authentication
+This is an implementation of the IETF’s HTTP signature authentication
 scheme. The idea is to authenticate connections (over HTTPS ideally)
 using either an RSA keypair or a symmetric key by signing a set of
 header values.

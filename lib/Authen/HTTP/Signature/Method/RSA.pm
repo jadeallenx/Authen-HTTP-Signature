@@ -16,7 +16,7 @@ Crypt::HTTP::Signature::Method::RSA - Compute digest using asymmetric keys
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 PURPOSE
 
