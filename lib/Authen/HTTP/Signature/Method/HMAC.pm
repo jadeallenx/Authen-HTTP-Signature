@@ -81,7 +81,7 @@ sub _pad_base64 {
     my $n = length($b64_str) % 4;
 
     if ( $n ) {
-        $b64_str .= '=' x $n;
+        $b64_str .= '=' x (4-$n);
     }
 
     return $b64_str;
