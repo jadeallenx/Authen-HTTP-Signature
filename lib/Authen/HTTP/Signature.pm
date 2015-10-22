@@ -17,7 +17,7 @@ Authen::HTTP::Signature - Sign and validate HTTP headers
 
 =head1 VERSION
 
-Version 0.02
+Version 0.03
 
 =cut
 
