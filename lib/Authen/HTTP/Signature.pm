@@ -65,7 +65,7 @@ Validate signatures:
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
             Date => 'Thu, 05 Jan 2012 21:31:40 GMT',
-            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
+            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256",signature="ATp0r26dbMIxOopqw0OfABDT7CKMIoENumuruOtarj8n/97Q3htHFYpH8yOSQk3Z5zh8UxUym6FYTb5+A0Nz3NRsXJibnYi7brE/4tx5But9kkFGzG+xpUmimN4c3TMN7OFH//+r8hBf7BT9/GmHDUVZT2JzWGLZES2xDOUuMtA="},
             Content => '{"hello": "world"}'
     );
 
@@ -89,7 +89,7 @@ Validate signatures:
 
 =head1 PURPOSE
 
-This is an implementation of Joyent's HTTP signature authentication scheme. The idea is to authenticate
+This is an implementation of the IETF HTTP Signatures specification authentication scheme. The idea is to authenticate
 connections (over HTTPS ideally) using either an RSA keypair or a symmetric key by signing a set of header
 values.
 
@@ -159,6 +159,15 @@ This attribute can have a psuedo-value. It is:
 
 Use the method, text of the path and query from the request, and the protocol version signature
 (i.e., C</foo?param=value&pet=dog HTTP/1.1>) as part of the signing string.
+
+=back
+
+=over
+
+=item * C<(request-target)>
+
+Use the method, text of the path and query from the request
+(i.e., C<get /foo?param=value&pet=dog>) as part of the signing string.
 
 =back
 
@@ -286,7 +295,7 @@ This callback represents the method to get header values from the object in the 
 The request will be the first parameter, and name of the header to fetch a value will be provided
 as the second parameter to the callback.
 
-B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
+B<NOTE>: The callback should be prepared to handle a "pseudo-header" of C<request-line> which
 is the path and query portions of the request's URI and HTTP version string.
 (For more information see the
 L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
