@@ -28,7 +28,7 @@ object and populates attributes in a L<Authen::HTTP::Signature> object.
 
 =item request
 
-The request to be parsed. 
+The request to be parsed.
 
 =back
 
@@ -65,28 +65,34 @@ has 'get_header' => (
     is => 'rw',
     isa => sub { die "'get_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
     predicate => 'has_get_header',
-    default => sub { 
+    default => sub {
         sub {
             confess "Didn't get 2 arguments" unless @_ == 2;
             my $request = shift;
             confess "'request' isn't blessed" unless blessed $request;
             my $name = shift;
 
-            $name eq 'request-line' ? 
-                sprintf("%s %s", 
+            if( $name eq 'request-line' ) {
+                sprintf("%s %s",
                     $request->uri->path_query,
-                    $request->protocol)
-                : $request->header($name);
+                    $request->protocol);
+            } elsif( $name eq '(request-target)' ) {
+                sprintf("%s %s",
+                    lc($request->method),
+                    $request->uri->path_query);
+            } else {
+                    $request->header($name);
+            }
         };
     },
     lazy => 1,
 );
 
-=over 
+=over
 
 =item skew
 
-Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range, 
+Defaults to 300 seconds in either direction from your clock. If the Date header data is outside of this range,
 the request is considered invalid.
 
 Set this value to 0 to disable skew checks for testing purposes.
@@ -130,18 +136,13 @@ sub parse {
     my ( $sig_text ) = $sig_str =~ /^(Signature).*$/;
     confess "does not match required string 'Signature'" unless $sig_text;
 
-    my ( $params ) = $sig_str =~ /^Signature\s+(keyId=".*").*$/;
-    confess "No parameters found!" unless $params;
-
-    my ( $b64_str ) = $sig_str =~ /^.*"\s+(\S+)$/;
+    my ( $b64_str ) = $sig_str =~ /^Signature.*signature="(.*?)".*$/;
     confess "No signature data found!" unless $b64_str;
 
-    # Probably ought to use a module here, but...
-    #
-    # Positive lookbehind and positive lookahead in split
-    # http://www.effectiveperlprogramming.com/blog/1411
-
-    my ( $key_id, $algo, $hdrs, $ext ) = split /(?<="),(?=[ahe].+=)/, $params;
+    my ( $key_id ) = $sig_str =~ /^Signature.*(keyId=".*?").*$/;
+    my ( $algo ) = $sig_str =~ /^Signature.*(algorithm=".*?").*$/;
+    my ( $ext ) = $sig_str =~ /^Signature.*(ext=".*?").*$/;
+    my ( $hdrs ) = $sig_str =~ /^Signature.*(headers=".*?").*$/;
 
     $key_id =~ s/^keyId="(.*)"$/$1/;
     $algo =~ s/^algorithm="(.*)"$/$1/;
@@ -170,9 +171,12 @@ sub parse {
     # normalize headers to lower-case
     @headers = map { lc } @headers;
 
-    my $ss = join "\n", map { 
-        $self->get_header->($request, $_) 
-            or confess "Couldn't get header value for $_\n" } @headers;
+    my $ss = join "\n", map {
+        if( $self->get_header->($request, $_) ) {
+            sprintf("%s: %s", $_, $self->get_header->($request, $_) );
+        } else {
+            confess "Couldn't get header value for $_\n";
+        } } @headers;
 
     return Authen::HTTP::Signature->new(
         key_id         => $key_id,
@@ -191,8 +195,7 @@ sub _check_skew {
     if ( $self->skew ) {
         my $request = shift;
         confess "No request found" unless $request;
-
-        my $header_time = str2time($self->get_header->($request, 'date'));
+        my $header_time = str2time( $self->get_header->($request, 'date') );
         confess "No Date header was returned (or could be parsed)" unless $header_time;
 
         my $diff = abs(time - $header_time);

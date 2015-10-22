@@ -39,17 +39,17 @@ Create signatures:
         key_id => 'Test',
     );
 
-    my $req = POST('http://example.com/foo?param=value&pet=dog', 
+    my $req = POST('http://example.com/foo?param=value&pet=dog',
             Content_Type => 'application/json',
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
             Content => '{"hello": "world"}'
     );
 
-    my $signed_req = $signer->sign($req); 
+    my $signed_req = $signer->sign($req);
 
-    # adds then signs the 'Date' header with private key using 
-    # RSA-SHA256, then adds 'Authorization' header to 
+    # adds then signs the 'Date' header with private key using
+    # RSA-SHA256, then adds 'Authorization' header to
     # $req
 
 Validate signatures:
@@ -60,12 +60,12 @@ Validate signatures:
     use File::Slurp qw(read_file);
     use Try::Tiny;
 
-    my $req = POST('http://example.com/foo?param=value&pet=dog', 
+    my $req = POST('http://example.com/foo?param=value&pet=dog',
             Content_Type => 'application/json',
             Content_MD5 => 'Sd/dVLAcvNLSq16eXua5uQ==',
             Content_Length => 18,
             Date => 'Thu, 05 Jan 2012 21:31:40 GMT',
-            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=},
+            Authorization => q{Signature keyId="Test",algorithm="rsa-sha256",signature="ATp0r26dbMIxOopqw0OfABDT7CKMIoENumuruOtarj8n/97Q3htHFYpH8yOSQk3Z5zh8UxUym6FYTb5+A0Nz3NRsXJibnYi7brE/4tx5But9kkFGzG+xpUmimN4c3TMN7OFH//+r8hBf7BT9/GmHDUVZT2JzWGLZES2xDOUuMtA="},
             Content => '{"hello": "world"}'
     );
 
@@ -89,8 +89,8 @@ Validate signatures:
 
 =head1 PURPOSE
 
-This is an implementation of Joyent's HTTP signature authentication scheme. The idea is to authenticate
-connections (over HTTPS ideally) using either an RSA keypair or a symmetric key by signing a set of header 
+This is an implementation of the IETF HTTP Signatures specification authentication scheme. The idea is to authenticate
+connections (over HTTPS ideally) using either an RSA keypair or a symmetric key by signing a set of header
 values.
 
 If you wish to use SSH keys for validation as in Joyent's proposal, check out L<Convert::SSH2>.
@@ -129,17 +129,17 @@ One of:
 
 has 'algorithm' => (
     is => 'ro',
-    isa => sub { 
-        my $n = lc shift; 
-        confess "$n doesn't match any supported algorithm.\n" unless 
+    isa => sub {
+        my $n = lc shift;
+        confess "$n doesn't match any supported algorithm.\n" unless
             scalar grep { $_ eq $n } qw(
-                rsa-sha1 
-                rsa-sha256 
-                rsa-sha512 
-                hmac-sha1 
-                hmac-sha256 
+                rsa-sha1
+                rsa-sha256
+                rsa-sha512
+                hmac-sha1
+                hmac-sha256
                 hmac-sha512
-            ); 
+            );
     },
     default => sub { 'rsa-sha256' },
 );
@@ -148,7 +148,7 @@ has 'algorithm' => (
 
 =item headers
 
-The list of headers to be signed (or already signed.) Defaults to the 'Date' header. The order of the headers 
+The list of headers to be signed (or already signed.) Defaults to the 'Date' header. The order of the headers
 in this list will be used to build the order of the text in the signing string.
 
 This attribute can have a psuedo-value. It is:
@@ -157,8 +157,17 @@ This attribute can have a psuedo-value. It is:
 
 =item * C<request-line>
 
-Use the method, text of the path and query from the request, and the protocol version signature 
+Use the method, text of the path and query from the request, and the protocol version signature
 (i.e., C</foo?param=value&pet=dog HTTP/1.1>) as part of the signing string.
+
+=back
+
+=over
+
+=item * C<(request-target)>
+
+Use the method, text of the path and query from the request
+(i.e., C<get /foo?param=value&pet=dog>) as part of the signing string.
 
 =back
 
@@ -176,7 +185,7 @@ has 'headers' => (
 
 =item signing_string
 
-The string used to compute the signature digest. It contents are derived from the 
+The string used to compute the signature digest. It contents are derived from the
 values of the C<headers> array.
 
 =back
@@ -245,7 +254,7 @@ has 'key' => (
 Required.
 
 A means to identify the key being used to both sender and receiver. This can be any token which makes
-sense to the sender and receiver. The exact specification of a token and any necessary key management 
+sense to the sender and receiver. The exact specification of a token and any necessary key management
 are outside the scope of this library.
 
 =back
@@ -279,16 +288,16 @@ has 'request' => (
 
 =item get_header
 
-Expects a C<CODE> reference.  
+Expects a C<CODE> reference.
 
-This callback represents the method to get header values from the object in the C<request> attribute. 
+This callback represents the method to get header values from the object in the C<request> attribute.
 
-The request will be the first parameter, and name of the header to fetch a value will be provided 
+The request will be the first parameter, and name of the header to fetch a value will be provided
 as the second parameter to the callback.
 
-B<NOTE>: The callback should be prepared to handle a "psuedo-header" of C<request-line> which
-is the path and query portions of the request's URI and HTTP version string. 
-(For more information see the 
+B<NOTE>: The callback should be prepared to handle a "pseudo-header" of C<request-line> which
+is the path and query portions of the request's URI and HTTP version string.
+(For more information see the
 L<HTTP signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>.)
 
 =back
@@ -299,18 +308,26 @@ has 'get_header' => (
     is => 'rw',
     isa => sub { die "'get_header' expects a CODE ref\n" unless ref($_[0]) eq "CODE" },
     predicate => 'has_get_header',
-    default => sub { 
+    default => sub {
         sub {
             confess "Didn't get 2 arguments" unless @_ == 2;
             my $request = shift;
             confess "'request' isn't blessed" unless blessed $request;
             my $name = lc(shift);
 
-            $name eq 'request-line' ? 
-                sprintf("%s %s", 
+            if( $name eq 'request-line' ) {
+                sprintf("request-line: %s %s",
                     $request->uri->path_query,
-                    $request->protocol)
-                : $request->header($name);
+                    $request->protocol);
+            } elsif( $name eq '(request-target)' ) {
+                sprintf("(request-target): %s %s",
+                    lc($request->method),
+                    $request->uri->path_query);
+            } elsif( $request->header($name) ) {
+                sprintf("%s: %s",
+                    $name,
+                    $request->header($name) );
+            }
         };
     },
     lazy => 1,
@@ -380,19 +397,19 @@ sub _update_signing_string {
     confess "I can't update the signing string because I don't have a request" unless $request;
     confess "I can't update the signing string because I don't have a 'get_header' callback" unless $self->has_get_header;
 
-    my $ss = join "\n", map { 
-        $self->get_header->($request, $_) 
+    my $ss = join "\n", map {
+        $self->get_header->($request, $_)
             or confess "Couldn't get header value for $_\n" } @{ $self->headers };
 
     $self->signing_string( $ss );
-     
+
     return $ss;
 }
 
 sub _format_signature {
     my $self = shift;
-    
-    my $rv = sprintf(q{%s keyId="%s",algorithm="%s"}, 
+
+    my $rv = sprintf(q{%s keyId="%s",algorithm="%s"},
                 $self->authorization_string,
                 $self->key_id,
                 $self->algorithm
@@ -409,7 +426,7 @@ sub _format_signature {
         $rv .= q{,ext="} . $self->extensions . q{"};
     }
 
-    $rv .= q{ } . $self->signature;
+    $rv .= q{,signature="} . $self->signature . q{"};
 
     return $rv;
 
@@ -483,7 +500,7 @@ sub sign {
 
 =item verify()
 
-This method verifies that a signature on a request is valid. 
+This method verifies that a signature on a request is valid.
 
 By default it uses C<key>.  You may optionally pass in key material and it
 will use that instead.
@@ -571,8 +588,8 @@ L<https://github.com/mrallen1/Authen-HTTP-Signature/>
 
 =head1 SEE ALSO
 
-L<Authen::HTTP::Signature::Parser>, 
-L<Authen::HTTP::Signature::Method::HMAC>, 
+L<Authen::HTTP::Signature::Parser>,
+L<Authen::HTTP::Signature::Method::HMAC>,
 L<Authen::HTTP::Signature::Method::RSA>
 
 L<Joyent's HTTP Signature specification|https://github.com/joyent/node-http-signature/blob/master/http_signing.md>
