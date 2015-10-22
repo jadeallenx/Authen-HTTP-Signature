@@ -3,7 +3,7 @@ use 5.010;
 use strict;
 use warnings;
 
-use Test::More tests => 13;
+use Test::More tests => 12;
 use Test::Fatal;
 
 my $reqstr = <<_EOT;
@@ -18,13 +18,13 @@ _EOT
 
 my $key = 'kweepa!';
 
-my $invalid_hdr = q|Signature keyId="parser_test",algorithm="hmac-sha1",headers="request-line date foobar" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $dup_hdr = q|Signature keyId="parser_test",algorithm="hmac-sha1",headers="request-line date date" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $no_key_id = q|Signature keyId="",algorithm="hmac-sha1",headers="request-line date" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $no_algo = q|Signature keyId="parser_test",algorithm="",headers="request-line date" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $bogus_algo = q|Signature keyId="parser_test",algorithm="crap",headers="request-line date" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $degenerate = q|Signature keyId="fo,o",algorithm="hmac-sha1",headers="rEQUest-LiNe dATe" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
-my $ext = q|Signature keyId="foo",algorithm="hmac-sha1",headers="request-line date",ext="foobar" eQjZuLJsT/Uy05xjC4BXHC+UYBE===|;
+my $invalid_hdr = q|Signature keyId="parser_test",algorithm="hmac-sha1",headers="request-line date foobar",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $dup_hdr = q|Signature keyId="parser_test",algorithm="hmac-sha1",headers="request-line date date",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $no_key_id = q|Signature keyId="",algorithm="hmac-sha1",headers="request-line date",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $no_algo = q|Signature keyId="parser_test",algorithm="",headers="request-line date",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $bogus_algo = q|Signature keyId="parser_test",algorithm="crap",headers="request-line date",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $degenerate = q|Signature keyId="fo,o",algorithm="hmac-sha1",headers="rEQUest-LiNe dATe",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
+my $ext = q|Signature keyId="foo",algorithm="hmac-sha1",headers="request-line date",ext="foobar",signature="eQjZuLJsT/Uy05xjC4BXHC+UYBE==="|;
 
 use Authen::HTTP::Signature;
 use HTTP::Request;
@@ -56,10 +56,6 @@ like($e, qr/[Nn]o authorization header/, 'no auth header fails');
 $missing_auth->header('authorization' => 'foobar');
 $e = exception { Authen::HTTP::Signature::Parser->new($missing_auth)->parse(); };
 like($e, qr/Signature/, 'missing Signature fails');
-
-$missing_auth->header('authorization' => 'Signature foobar');
-$e = exception { Authen::HTTP::Signature::Parser->new($missing_auth)->parse(); };
-like($e, qr/parameters/, 'missing params fails');
 
 $missing_auth->header('authorization' => 'Signature keyId="foobar"');
 $e = exception { Authen::HTTP::Signature::Parser->new($missing_auth)->parse(); };

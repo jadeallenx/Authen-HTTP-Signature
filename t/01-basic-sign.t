@@ -13,9 +13,8 @@ Content-Length: 18
 {"hello": "world"}
 _EOT
 
-my $default = q{Signature keyId="Test",algorithm="rsa-sha256" MDyO5tSvin5FBVdq3gMBTwtVgE8U/JpzSwFvY7gu7Q2tiZ5TvfHzf/RzmRoYwO8PoV1UGaw6IMwWzxDQkcoYOwvG/w4ljQBBoNusO/mYSvKrbqxUmZi8rNtrMcb82MS33bai5IeLnOGl31W1UbL4qE/wL8U9wCPGRJlCFLsTgD8=};
-my $all = q{Signature keyId="Test",algorithm="rsa-sha256",headers="request-line host date content-type content-md5 content-length" gVrKP7wVh1+FmWbNlhj0pNXIe9XmeOA6EcnoOKAvUILnwaMFzaKaam9UmeDPwjC9TdT+jSRqjtyZE49kZcSpYAHxGlPQ4ziXFRfPprlN/3Xwg3sUOGqbBiS3WFuY3QOOWv4tzc5p70g74U/QvHNNiYMcjoz89vRJhefbFSNwCDs=};
-
+my $default = q{Signature keyId="Test",algorithm="rsa-sha256",signature="ATp0r26dbMIxOopqw0OfABDT7CKMIoENumuruOtarj8n/97Q3htHFYpH8yOSQk3Z5zh8UxUym6FYTb5+A0Nz3NRsXJibnYi7brE/4tx5But9kkFGzG+xpUmimN4c3TMN7OFH//+r8hBf7BT9/GmHDUVZT2JzWGLZES2xDOUuMtA="};
+my $all = q{Signature keyId="Test",algorithm="rsa-sha256",headers="request-line host date content-type content-md5 content-length",signature="NSgN91rEJ7F0W2YjD1iT1FawHJVet2VWctBs7o283TSsPA75kCaUVo2JlnbFqJ5mNs0Dx+mexF1kS/7qaDcS4ht5UXvEG+DDB2x75WuTW62Q6wEVmpxmR92zNkBCMWouN7vB9kbx9BdtUqoeyPEZHH1TMLLrFUBQKt2yR2JKoB8="};
 my $private_str = <<_EOT;
 -----BEGIN RSA PRIVATE KEY-----
 MIICXgIBAAKBgQDCFENGw33yGihy92pDjZQhl0C36rPJj+CvfSC8+q28hxA161QF
